@@ -1,2 +1,7 @@
 # pollution_flow
-This repository contains the r code for the paper effect of pollution and flow condition in riparian ecosystem
+This repository contains data and r code for the manuscript (Flow reduction affects subsidy of riparian ecosystems by contaminated streams: evidence from a mesocosm study) submitted for publication.
+
+Wriiten by Collins Ogbeide, reviewed by 
+
+Content overview:
+Data: 
