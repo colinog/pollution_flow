@@ -1,15 +1,17 @@
+#gitcreds::gitcreds_set()
+#theme_set(theme_bw())
+#renv::snapshot()
 library(tidyverse)
 library(glmmTMB)  
 library(openxlsx)
 library(DHARMa)
-library(car)
 library(car)
 library(emmeans)
 library(rstatix)
 
 ##### Data visualization ########
 
-abu_bio = readRDS("Data/dry_sample.rds") #read in emergence and biomass data
+abu_bio = readRDS("All_code_data_visualization/dry_sample.rds") #read in emergence and biomass data
 pj = position_dodge(width = 0.3)
 ######### standardise abundance visualization ##############
 abu_bio |> 
@@ -39,7 +41,7 @@ abu_bio |>
     plot.tag = element_text(face = "bold")
   )
 
-ggsave("Data/plot/abundance.png", dpi = 300, width = 15, height = 12, units = "cm") 
+ggsave("All_code_data_visualization/plot/abundance.png", dpi = 300, width = 15, height = 12, units = "cm") 
 ########## standardize biomass visualization #####
 abu_bio |> 
   dplyr::group_by(Treatment, Week) |>  #group by Treatment and Week
@@ -68,10 +70,10 @@ abu_bio |>
     plot.tag = element_text(face = "bold")
   )
 
-ggsave("Data/plot/biomass.png", dpi = 300, width = 15, height = 12, units = "cm")
+ggsave("All_code_data_visualization/plot/biomass.png", dpi = 300, width = 15, height = 12, units = "cm")
 ###### spider abundance #########
 
-spider_dat = readRDS("Data/spider_data.rds")
+spider_dat = readRDS("All_code_data_visualization/spider_data.rds")
 
 spider_dat |> 
   dplyr::group_by(Treatment,Family) |> # group by Treatment and Family
@@ -97,11 +99,11 @@ spider_dat |>
     plot.tag = element_text(face = "bold"),
   )
 
-ggsave("Data/plot/spider.png", dpi = 300, width = 15, height = 12, units = "cm")
+ggsave("All_code_data_visualization/plot/spider.png", dpi = 300, width = 15, height = 12, units = "cm")
 
 ##### Pesticide concentration in water ########
 
-pest_water = readRDS("Data/pesticide_water.rds")
+pest_water = readRDS("All_code_data_visualization/pesticide_water.rds")
 
 ####Time series plot of daily pesticide concentration in water ######
 
@@ -143,11 +145,11 @@ pest_water |>
         plot.tag = element_text(face = "bold"),
   )
 
-ggsave("Data/plot/pest_water.png", dpi = 300, width = 22, height = 18, units = "cm")
+ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22, height = 18, units = "cm")
 
 ####### Pesticide concentration in sediment under control and low-flow treatments
 
-sed_pest = readRDS("Data/sediment_pesticide.rds")
+sed_pest = readRDS("All_code_data_visualization/sediment_pesticide.rds")
 
 #####Visualize by mean pesticide concentration under control and low-flow
 #The treatment column is a categorical variable with control (C) and low-flow (D)
@@ -176,7 +178,7 @@ sed_pest |>
     plot.tag = element_text(face = "bold"),
   )
 
-ggsave("Data/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
+ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
 
 ######Statistical analysis of all tested hypothesis ######
 ####Emergence data for both mass flux and emergence rate
@@ -364,7 +366,7 @@ mtw$contrasts %>%
 # 
 # saveRDS(phch_1,"Data/RSM_2021_phch.rds" )
 
-phch_1 = readRDS("Data/RSM_2021_phch.rds")
+phch_1 = readRDS("All_code_data_visualization/RSM_2021_phch.rds")
 ##I removed flume 3,8,12, and 15 which was not included in low-flow experiment
 
 # wtw_1 = readxl::read_excel("../Verena_Schreiner/RSM_2021_phch.xlsx", 
@@ -377,7 +379,7 @@ phch_1 = readRDS("Data/RSM_2021_phch.rds")
 # 
 # saveRDS(wtw_1,"Data/wtw.rds")
 
-wtw_1 = readRDS("Data/wtw.rds")
+wtw_1 = readRDS("All_code_data_visualization/wtw.rds")
 
 ##I excluded the month of May and September data,Low-flow was June to July
 
