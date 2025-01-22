@@ -29,6 +29,15 @@ water_sum = dat_water %>%
   #dplyr::filter(Type %in% "Fungicide") |> 
   #arrange(desc(n)) |>
   #slice(1:5)
+water_ = LOQ_water |> 
+  filter(!Type %in% "Metabolite") |> 
+  filter(!Analyte %in% c("Proquinazid", "Fipronil")) |> 
+  mutate(across(Concentration, as.numeric)) |> 
+  dplyr::select(-"Sample") |> 
+  rename("Concentration(µg/L)" = "Concentration") |> 
+  rename("Class" = "Type")
+
+write.xlsx(water_, "./Data/Pesticide_water_LOQ.xlsx")
 
 mean(sediment_sum$n)
 
@@ -36,12 +45,39 @@ write.csv(water_sum, "water_con.csv")
 write.csv(sediment_sum, "sediment_con.csv")
 str(dat_sed)
 
-sediment_sum = dat_sed %>%
-  group_by(Treatment, Week, Pesticide_Class) %>%
+sediment_sum = sed_pest %>%
+  group_by(Treatment,Pesticides, Week) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "full") 
   arrange(desc(n)) |> 
   slice(1:5)
 
+
+s_ = dat_sed %>%
+  #count(Analyte, name = "count") |> 
+  group_by(Analyte, Pesticide_Class) |>
+  summarise(count = n(), LOQ = mean(LOQ_µg_kg, na.rm = TRUE)) |> 
+  dplyr::select(Pesticide_Class, Analyte, LOQ) |> 
+  arrange(Pesticide_Class) |> 
+  rename("Class" = "Pesticide_Class") |> 
+  rename("LOQ(µg/kg)" = "LOQ")
+write.xlsx(s_, "./Data/Pesticide_sediment_LOQ.xlsx")  
+
+library(ggpubr)
+ggboxplot(sediment_sum, x = "Treatment", y = "n",
+          color = "Treatment", # Color by Treatment
+          palette = "jco", # Journal color palette
+          add = "jitter", # Add jitter points for individual observations
+          xlab = "Time (Weeks)", 
+          ylab = "Number of Pesticide Detections",
+          title = "Number of Pesticide Detections Over Time",
+          legend.title = "Treatment") +
+  theme_pubr(base_size = 14) + # Publication theme
+  theme(legend.position = "bottom", 
+        plot.title = element_text(hjust = 0.5)) # Adjust legend and title   
+
+  
+  dat_sed |> 
+  ggplot(aes())
 write.xlsx(sediment_sum, "sedinment_class.xlsx")
 
 sediment_sum |> 
@@ -56,31 +92,38 @@ emerg_insect = read.csv("./original_spider_emergence/Emergence_RSM_Mass.csv",
 
 #######Percentage estimation######
 emerg_p = emerg_insect |> 
-  filter(Sampling %in% "Passive")
+  filter(Sampling %in% "Passive") 
+  #filter(!mg.pro.Ind %in% NA)
 str(emerg_p)
 
 emerg_tab = emerg_p |> 
-  dplyr::select(-c(1:8,13,19)) |> 
+  dplyr::select(-c(1:6, 19)) |> 
   tidyr::pivot_longer(
-    5:10,
+    8:13,
     names_to = "Order_family",
-    values_to = "Count")
+    values_to = "Count") |> 
+  filter(!Order_family %in% c("no..Chironomids", "Diptera"))
+
+emerg_tab |> 
+  dplyr::group_by(Order_family) |> 
+  summarise(sum(Count, na.rm = T))
+  #rstatix::get_summary_stats(Count, type = "mean_ci")
+  
 
 emerg_sum = emerg_tab |> 
   dplyr::mutate(Days = 7) |> 
   dplyr::mutate(Area = 1) |> 
-  dplyr::filter(!Count %in% NA) |> 
+  #dplyr::filter(!Count %in% NA) |> 
   dplyr::mutate(CPUE = Count/(Area * Days)) |> 
   group_by(Order_family, Position, Treatment) |> 
-  rstatix::get_summary_stats(CPUE, type = "mean_se") 
+  rstatix::get_summary_stats(Count, type = "mean_se") 
 
 write.xlsx(emerg_sum, "./plot/emerg_sum_SI.xlsx")
   
 
 
 
-sum(sum(emerg_p$no..Chironomids, na.rm = T),
-sum(emerg_p$No..Other.Nematocera, na.rm = T),
+sum(sum(emerg_tab$No..Other.Nematocera, na.rm = T),
 sum(emerg_p$No..mayflies, na.rm = T),
 sum(emerg_p$No..Plecoptera, na.rm = T),
 sum(emerg_p$no..Trichoptera, na.rm = T))
@@ -108,61 +151,96 @@ no_chiro = emerg_insect |>
     values_to = "Count") |> 
    mutate(family = str_remove(No_individual,"no\\..|No.."))
 
-passive_sample = emerg_dat |> 
+p_sample = emerg_dat |> 
   filter(Sampling %in% "Passive") |> 
   dplyr::mutate(Days = 7) |> 
   dplyr::mutate(Area = 1) |> 
   dplyr::mutate(CPUE = Calculated.No..Ind/(Area * Days)) |> 
   dplyr::mutate(mass_flux = Emergence.mass..mg./(Area * Days)) |> 
   dplyr::mutate_at(vars(c(Flume,Sampling,Position,Treatment,
-                        Size.group)), as.factor) 
-  #mutate(Treatment = if_else(Treatment == "Low-flow", "Low flow", Treatment))
+                        Size.group)), as.factor) |> 
+  # mutate(Experiment.Week = case_when(
+  #   Date.2021 == "22.06.2021" ~ 1,
+  #   Date.2021 == "29.06.2021" ~ 2,
+  #   Date.2021 == "07.07.2021" ~ 3,
+  #   Date.2021 == "13.07.2021" ~ 4,
+  #   Date.2021 == "20.07.2021" ~ 5,
+  #   TRUE ~ Experiment.Week
+  # )) |> 
+  rename(Week = Experiment.Week) |> 
+  mutate(across(c(Week), as.factor))
+
+
+all_sample = rbind(a_sample, p_sample)
 
 
 passive_sample |> 
   ggplot(aes(Treatment,mass_flux, fill = Treatment))+
-  geom_boxplot(position = "dodge2") +
-  theme_Publication()
+  geom_boxplot(position = "dodge2") 
 
-a =passive_sample |> 
-  dplyr::select(Treatment, Position,Experiment.Week, mass_flux) |> 
-  rstatix::group_by(Treatment, Experiment.Week) |> 
-  rstatix::get_summary_stats(type = "full")
+a =p_sample |> 
+  #filter(Flume %in% 2)
+  #dplyr::select(Treatment, Position,Experiment.Week, mass_flux) |> 
+  rstatix::group_by(Flume, Week) |> 
+  rstatix::get_summary_stats(CPUE,type = "full")
 
 
 
 pd = position_dodge(width = 0.1)
 
-passive_sample |> 
-  dplyr::group_by(Treatment, Experiment.Week) |> 
-  rstatix::get_summary_stats(CPUE, type = "full")|> 
-  ggplot(aes(Experiment.Week,mean, fill = Treatment, color = Treatment, 
-             shape = Treatment, linetype = Treatment))+
+str(p_sample)
+p_sample |> 
+  #filter(Position %in% "outlet") |> 
+  dplyr::group_by(Treatment, Week) |> 
+  rstatix::get_summary_stats(mass_flux, type = "full")|> 
+  ggplot(aes(Week,mean, fill = Treatment, color = Treatment, 
+             shape = Treatment, linetype = Treatment, group = Treatment))+
   geom_point( position = pd, size = 3, color = "black")+
   geom_line(position = pd, color = "black", linewidth = 0.3)+
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
+  geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), 
                 width = 0.1, position = pd, color = "black") +
   scale_fill_viridis_d(option = "plasma")+
   scale_linetype_manual(values = c("solid", "dashed"))+
-  labs(y = expression(bold("Emergence rate (ind. m"^-2*" day"^-1*")")), 
-       x = "Sampling Week")+
+  labs(y = expression(bold("Emergence rate (Abund. m"^-2*" day"^-1*")")), 
+       x = expression(bold("Sampling Week")))+
+  # theme_minimal(base_size = 14) +
+  # theme(legend.position = "bottom")
   #facet_wrap(~ Size.group, ncol = 1) 
   #labs(tag = "a)")+
   theme(
     panel.background = element_blank(),
     axis.line = element_line(color = "black"), 
     axis.title.y = element_text(face = "bold"),
-    axis.title = element_text(size = 15, color = "black",
+    axis.title = element_text(size = 13, color = "black",
                               face = "bold"),
-    axis.text = element_text(size = 15, face = "bold", color = "black"),
+    axis.text = element_text(size = 13, face = "bold", color = "black"),
     legend.position = "bottom",
-    legend.text = element_text(size = 15, face = "bold", color = "black"),
-    legend.title = element_text(size = 17),
-    strip.text = element_text(size = 15, face = "bold"),
+    legend.text = element_text(size = 12, face = "bold", color = "black"),
+    legend.title = element_text(size = 12),
+    strip.text = element_text(size = 13, face = "bold"),
     plot.tag = element_text(face = "bold")
   )
   
 ggsave("./plot/cpue.png", dpi = 300, width = 15, height = 12, units = "cm")  
+
+
+p_sample %>%
+  group_by(Week, Treatment) %>%
+  summarize(mean_cl_boot(CPUE)) %>%
+  # mutate(Month = as.numeric(sub("Month_", "", Month)),
+  #        Treatment = c("Control", "Treatment")[Treatment + 1]) %>%
+  ggplot(aes(Week, y, color = Treatment, group = Treatment)) +
+  geom_ribbon(aes(fill = Treatment, ymin = ymin, ymax = ymax), 
+              alpha = 0.1, color = NA) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  labs(y = "Monthly spending") +
+  theme_minimal(base_size = 16) +
+  theme(legend.position = "bottom")
+
+
 
 
 
@@ -265,10 +343,10 @@ ggboxplot(data = passive_sample, x = "Treatment", y = "mass_flux",
 
 
 
-passive_sample |> 
-  dplyr::group_by(Position, Treatment) |> 
+p_sample |> 
+  dplyr::group_by(Week, Treatment) |> 
   #dplyr::summarise(mass_flux = n(), .groups = "keep") |> 
-  ggplot(aes(Treatment,mass_flux, colour = Position))+
+  ggplot(aes(Treatment,mass_flux, colour = Treatment))+
   geom_point(alpha = 0.1)+
   stat_summary(
     fun.data = mean_cl_boot, #boot
@@ -276,7 +354,7 @@ passive_sample |>
     width = 0.1,
     position = position_dodge2(0.6))+
     scale_x_discrete(labels = c("Control", "Low Flow"))+
-  facet_wrap(~Position,ncol = 1)
+  facet_wrap(~Week,ncol = 1)
 
 
 
@@ -393,19 +471,28 @@ tet_dat = read.csv("./original_spider_emergence/Tetragnatha_Sampling.csv",
                                     "Low flow", Treatment)) 
   #dplyr::mutate_at(vars(c(Treatment, Flume)), as.factor)
 
-str(tet_count)
+lyco_abu  = lyco_count |> 
+  rename(Family = family) |> 
+  dplyr::mutate(Flume1 = str_extract(Flume, "\\d+$")) |> 
+  dplyr::select(-c(Flume)) |> 
+  rename(Flume = Flume1) |> 
+  dplyr::select(Flume, Treatment, Family, count)
 
 tet_count = tet_dat |> 
   dplyr::group_by(Flume,Treatment) |> 
-  dplyr::summarise(count = n()) |> 
-  dplyr::mutate(Family = "Tetragnathidae")
+  dplyr::summarise(count = n(),.groups = "keep") |> 
+  dplyr::mutate(Family = "Tetragnatha") |> 
+  dplyr::select(Flume, Treatment, Family, count) |> 
+  dplyr::ungroup() |> 
+  dplyr::mutate(across(count, as.numeric))
   #dplyr::mutate(F_T = str_c(Flume,Treatment, sep = "-")) |> 
   #dplyr::mutate_at(vars(c(Treatment)), as.factor)
+str(lyco_abu)
+spider_dat = rbind(tet_count,lyco_abu)
 
-
-tet_count = tet_dat |> 
-  dplyr::group_by(Flume,Treatment) |> 
-  dplyr::summarise(count = n(), .groups = "keep")
+# tet_count = tet_dat |> 
+#   dplyr::group_by(Flume,Treatment) |> 
+#   dplyr::summarise(count = n(), .groups = "keep")
 
 tet_dat |> 
   dplyr::group_by(Flume,Treatment) |> 
@@ -444,10 +531,12 @@ spider_ = spider_stat |>
   )
 )
 
+spider_dat %>%
+  group_by(Treatment) %>%
+  summarize(mean_count = mean(count), .groups = "drop")
 
-
-spider_ |> 
-  dplyr::group_by(Treatment, Family) |> 
+spider_dat |> 
+  dplyr::group_by(Treatment,Family) |> 
   rstatix::get_summary_stats(count, type = "mean_se")|> 
   ggplot(aes(Treatment, mean, fill = Family, color = Family, 
              shape = Family, linetype = Family))+
@@ -456,7 +545,7 @@ spider_ |>
                 width = 0.1, position = pj, color = "black") +
   ylim(0, 50)+
   scale_shape_manual(values = c(0,8))+
-  scale_x_discrete(labels = c("Control", "Low-flow"))+
+  #scale_x_discrete(labels = c("Control", "Low-flow"))+
   #scale_fill_viridis_d(option = "plasma")+
   #theme_Publication(base_size = 14) +
   labs(y = "Mean number of spiders", x = "Treatment")+
@@ -510,13 +599,13 @@ sp_lyc |>
 ##########Sediment concentration ######
 dat_sed |> 
   dplyr::group_by(Treatment, Week) |> 
-  rstatix::get_summary_stats(Concentration_µg_kg, type = "mean_se")|> 
+  rstatix::get_summary_stats(Concentration_µg_kg, type = "mean_ci")|> 
   ggplot(aes(Treatment, mean, fill = Week, shape = Week, linetype = Week))+
   geom_point(position = pj, size = 3, color = "black")+
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
+  geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), 
                 width = 0.1, position = pj, color = "black") +
   scale_shape_manual(values = c(5,6))+
-  #ylim(0, 0.2)+
+  ylim(0, 2.4)+
   scale_x_discrete(labels = c("Control", "Low-flow"))+
   #scale_fill_viridis_d(option = "plasma")+
   #theme_Publication(base_size = 14) +
@@ -618,27 +707,37 @@ cohen_d_value <- cohens_d(group1,group2)
 
 # New_Lycosidae_data_Karol ------------------------------------------------
 new_lyco = openxlsx::read.xlsx("./Karol_Lycosidae_2021/Lycosidae-2021_Final.xlsx",
-                               sheet = "Lycosidae")
+                               sheet = "Lycosidae") |> 
+  rename(genera = species)
+
+str(lyco_count)
 
 lyco_count = new_lyco |>
   dplyr::filter(family %in% "lycosidae") |>
   dplyr::group_by(Flume,Treatment, family) |>
-  dplyr::summarise(count = n(), .groups = "keep")
+  dplyr::summarise(count = n(), .groups = "keep") |> 
+  dplyr::ungroup() |> 
+  dplyr::mutate(across(c(Flume, Treatment), as.factor)) |> 
+  dplyr::mutate(across(count, as.numeric))
+  
+
+
 
 lyco_count |>
-  dplyr::group_by(Treatment) |>
-  rstatix::get_summary_stats(count, type = "mean_se") |>
-  ggplot(aes(Treatment,mean)) +
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+  dplyr::group_by(Treatment, family) |>
+  rstatix::get_summary_stats(count, type = "mean_ci") |>
+  ggplot(aes(Treatment,mean, group = Treatment)) +
+  geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci),
                 width = 0.1, position = pd, color = "black")+
   geom_point(position = pd, size = 3, color = "black")+
-  scale_x_discrete(labels = c("Control", "Low-Flow"))
+  scale_x_discrete(labels = c("Control", "Low-Flow"))+
+  facet_wrap(~family)
 
 # Effect size -------------------------------------------------------------
 
-eff_size_ab = passive_sample |> 
+eff_size_ab = lyco_count |> 
   #mutate(Treatment_Week = paste(Treatment, Position, sep = "_")) |> 
-  cohens_d(CPUE ~ Experiment.Week, var.equal = TRUE, conf.level = 0.95,
+  cohens_d(count ~ Treatment, var.equal = TRUE, conf.level = 0.95,
            ci.type = "perc", ci = T)
 
 eff_size_bio = passive_sample |> 

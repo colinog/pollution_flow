@@ -20,7 +20,7 @@ packageVersion("tidyverse")
 citation("emmeans")
 
 passive_stat = emerg_dat |> 
-  filter(Sampling %in% "Passive") |> 
+  #filter(Sampling %in% "Passive") |> 
   dplyr::mutate(Days = 7) |> 
   dplyr::mutate(Area = 1) |> 
   dplyr::mutate(CPUE = Calculated.No..Ind/(Area * Days)) |> 
@@ -122,9 +122,16 @@ str(passive_stat)
 summary(passive_stat$mass_flux)
 
 ####Emergence data for both mass flux and emergence rate
-f = glmmTMB(CPUE ~ Treatment + Sampling_week +
+p_sample = passive_sample |> 
+  filter(Sampling %in% "Passive")
+
+a_sample = passive_sample |> 
+  filter(Sampling %in% "Active")
+
+
+f = glmmTMB(CPUE ~ Treatment * Week +
               (1 | Flume),
-            data = passive_stat,
+            data = a_sample,
             family = Gamma(link = "log"))
 
 residuals <- residuals(f)
@@ -134,9 +141,9 @@ plot(autocorrelation, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 Box.test(residuals, lag = 20, type = "Ljung-Box")
 
 
-fit_ = glmmTMB(CPUE ~ Treatment + Sampling_week +
-                  (1 | Flume) + ar1(Sampling_week+0|Flume),
-                data = passive_stat,
+fit_ = glmmTMB(CPUE ~ Treatment * Week +
+                  (1 | Flume) + ar1(Week+0|Flume),
+                data = p_sample,
               family = Gamma(link = "log"))
 summary(fit_)
 
@@ -209,17 +216,17 @@ result = print(pairwise_comparisons)
 
 write.xlsx(result, "./plot/emm_mass.xlsx")
 
-
+str(spider_dat)
 #########Spider###
-tet_sp = spider_stat |> 
-  filter(Family %in% "Tetragnathidae") |> 
-  dplyr::select(-c(Family, Treat_fam)) |> 
-  dplyr::mutate(across((Flume), as.factor))
+tet_sp = spider_dat |> 
+  filter(Family %in% "Tetragnatha") |> 
+  #dplyr::select(-c(Family, Treat_fam)) |> 
+  dplyr::mutate(across(c(Flume, Treatment, Family), as.factor))
 
-lyc_sp = spider_stat |> 
-  filter(Family %in% "Lycosidae") |> 
-  dplyr::select(-c(Family, Treat_fam)) |> 
-  dplyr::mutate(across((Flume), as.factor))
+lyc_sp = spider_dat |> 
+  filter(Family %in% "lycosidae") |> 
+  #dplyr::select(-c(Family, Treat_fam)) |> 
+  dplyr::mutate(across(c(Flume, Treatment, Family), as.factor))
 
 ######Tetragnathidae####
 library(nlme)
@@ -235,7 +242,7 @@ plot(t)
 anova(t)
 
 fit_tet = glmmTMB(count ~  Treatment + (1|Flume), 
-                  data = tet_sp, family = poisson(link = "log"))
+                  data = spider_dat, family = poisson(link = "log"))
 
 summary(fit_tet)
 diagnose(fit_tet)
@@ -571,7 +578,7 @@ tet = spider_stat |>
 
 
 fit_sp = glmmTMB(count ~  Treatment * Family + (1|Flume), 
-                  data = spider_stat, family = poisson(link = "log"))
+                  data = spider_dat, family = poisson(link = "log"))
 summary(fit_sp)
 diagnose(fit_sp)
 testDispersion(fit_sp)
@@ -738,44 +745,128 @@ print(pairwise_comparisons)
 ########################################
 ######Sediment concentration#####
 
-sed_stat = dat_sed |> 
-  mutate(Flume = str_extract(Sample, "F\\d+")) |> 
-  mutate(across(Flume, as.factor))
-
-summary(sed_stat$Concentration_µg_kg)
-
-str(sed_stat)
-
-f = nlme::lme(log10(Concentration_µg_kg+1) ~ Treatment + Week, 
-              random = ~ 1 | Flume, data = sed_stat)
+# sed_stat = dat_sed |> 
+#   mutate(Flume = str_extract(Sample, "F\\d+")) |> 
+#   mutate(across(Flume, as.factor))
+# 
+# summary(sed_stat$Concentration_µg_kg)
+# 
+# str(sed_stat)
+# 
+f = lmer(Concentration ~ Treatment * Week +
+              (1 + Week | Flume), data = sed_pest)
 
 summary(f)
 hist(residuals(f), main = "Histogram of Residuals", xlab = "Residuals")
 qqnorm(residuals(f))
 qqline(residuals(f), col = "red")
 shapiro.test(residuals(f))
-library(nlme)
-sed_stat$Concentration <- log(sed_stat$Concentration_µg_kg+1)
-fit_sed <- lmer(Concentration_µg_kg ~ Treatment + Week +
-                  (1|Flume),
-               data = sed_stat)
-############################################
-fp = glmmTMB(Concentration ~  Treatment * Week
-             + (1|Flume),
-             data = sed_stat, family = Gamma(link = "log"))
+# library(nlme)
 
-residuals <- residuals(fp)
-autocorrelation <- acf(residuals, lag.max=40, plot=FALSE)
+# sed_stat$Concentration <- log(sed_stat$Concentration_µg_kg+1)
+# fit_sed <- lmer(Concentration ~ Treatment + Week +
+#                   (1|Flume),
+#                data = sed_stat)
+# summary(fit_sed)
+library(mgcv)
+model <- gam(Concentration ~ Week * Treatment,
+             data = sed_pest, family = Gamma())
+
+# Residual diagnostics
+mgcv::gam.check(model_gamm$gam)
+
+model_gamm <- gamm(Concentration ~ Week * Treatment,
+                   random = list(Flume = ~1),
+                   data = sed_pest, family = Gamma())
+# Summary of the fixed effects
+summary(model_gamm$gam)
+
+# Summary of the random effects
+summary(model_gamm$lme)
+
+plot(model_gamm$lme, shade = T)
+
+model_gammpql <-MASS::gammpql(
+  fixed = Concentration ~ s(Week) + Treatment,
+  random = ~1 | Flume,
+  family = Gamma,
+  data = sed_pest
+)
+
+
+
+
+residuals <- residuals(model_gamm$lme)
+autocorrelation <- acf(residuals, lag.max=40, plot=T)
 plot(autocorrelation, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 
 Box.test(residuals, lag = 20, type = "Ljung-Box")
 
+model_bam <- bam(Concentration ~ Week + Treatment + s(Flume, bs = "re"),
+                 data = sed_pest, family = gaussian())
 
-fit_sed = glmmTMB(Concentration ~  Treatment * Week
-                  + (1|Flume) + ar1(Week + 0|Flume),
-                  data = sed_stat, family = Gamma(link = "log"))
+############################################
+sed_pest$Concentration <- log(sed_pest$Concentration_µg_kg+1)
 
-# fit_sed = glm(Concentration_µg_kg ~  Treatment * Week,
+str(sed_pest)
+
+str(sediment_final)
+
+fp = glmmTMB(Concentration ~  Treatment * Week
+             + (1|Flume),
+             data = sed_pest, family = Gamma(link = "log"))
+
+summary(fp)
+diagnose(fp)
+simulateResiduals(fp, plot = T)
+
+residuals <- residuals(fp)
+autocorrelation <- acf(residuals, lag.max=40, plot=T)
+plot(autocorrelation, main="ACF of Residuals", xlab="Lag", ylab="ACF")
+
+Box.test(residuals, lag = 20, type = "Ljung-Box")
+
+ab = sed_pest |> 
+  dplyr::filter(!Class %in% "Herbicide")
+
+hist(sed_pest$Concentration_µg_kg)
+str(sediment_final)
+
+
+fit_sed = glmmTMB(Concentration ~   Treatment * Week
+                  + (1|Flume) + ar1(Week + 0 | Flume),
+                  data = sed_pest,
+                  family = Gamma(link = "log"))
+
+
+summary(fit_sed)
+diagnose(fit_sed)
+testDispersion(fit_sed)
+test
+res_sim = simulateResiduals(fit_sed, plot = T)
+#plotResiduals(res_sim, sed_stat$Pesticide_Class)
+#testOutliers(res_sim)
+#testQuantiles(res_sim)
+print(res_sim)
+plot(res_sim)
+plotQQunif(res_sim)
+plotResiduals(res_sim)
+Anova(fit_sed, type = 2)
+
+# emm <- emmeans(fit_sed, pairwise ~ Treatment | Week, type = "response")  # Pairwise comparisons
+# summary(emm)
+
+#########Pairwise Comparison########
+e_sed <- emmeans(fit_sed, ~ Treatment + Week,
+                 adjust = "bonferroni", detailed = T)
+pairwise_comparisons <- pairs(e_sed)
+summary(pairwise_comparisons, infer = TRUE)
+p_result = print(pairwise_comparisons)
+
+
+
+#+ ar1(Week + 0 | Flume)
+# fit_sed = glm(Concentratinbinom12()# fit_sed = glm(Concentration_µg_kg ~  Treatment * Week,
 #                   data = sed_stat, family = Gamma(link = "inverse"))
 # 
 # 
@@ -788,16 +879,91 @@ fit_sed = glmmTMB(Concentration ~  Treatment * Week
 # hist(residuals_glmm)
 # hist(sed_stat$Concentration_µg_kg)
 
+residuals <- residuals(fit_sed)
+shapiro.test(residuals)
+
 summary(fit_sed)
 diagnose(fit_sed)
 testDispersion(fit_sed)
 res_sim = simulateResiduals(fit_sed, plot = T)
+#plotResiduals(res_sim, sed_stat$Pesticide_Class)
+#testOutliers(res_sim)
+#testQuantiles(res_sim)
 print(res_sim)
 plot(res_sim)
 plotQQunif(res_sim)
 plotResiduals(res_sim)
 Anova(fit_sed, type = 2)
 
+#########Pairwise Comparison########
+e_sed <- emmeans(fit_sed, ~ Treatment * Week,
+                 adjust = "bonferroni")
+pairwise_comparisons <- pairs(e_sed)
+summary(pairwise_comparisons, infer = TRUE)
+p_result = print(pairwise_comparisons)
+
+
+# # Extract scaled residuals
+# residuals <- res_sim$scaledResiduals
+# 
+# # Plot density of residuals
+# plot(density(residuals),
+#      main = "Density of Residuals",
+#      xlab = "Residuals",
+#      ylab = "Density",
+#      col = "blue",
+#      lwd = 2)
+# 
+# # Add a normal distribution curve
+# curve(dnorm(x, mean = mean(residuals), sd = sd(residuals)), 
+#       col = "red", 
+#       lwd = 2, 
+#       add = TRUE)
+# 
+# # Optional: Add a uniform distribution curve (for DHARMa residuals)
+# curve(dunif(x, min = 0, max = 1), 
+#       col = "green", 
+#       lwd = 2, 
+#       add = TRUE)
+# 
+# # Add legend
+# legend("topright", legend = c("Residual Density", "Normal Curve", "Uniform Curve"),
+#        col = c("blue", "red", "green"), lwd = 2)
+# 
+# 
+# # Calculate residual variance by class
+# class_var <- sed_stat %>%
+#   mutate(residual = res_sim$scaledResiduals) %>%
+#   group_by(Pesticide_Class) %>%
+#   summarise(var_residual = var(residual))
+# 
+# # Compute weights inversely proportional to variance
+# class_var <- class_var %>%
+#   mutate(weight = 1 / var_residual)
+# 
+# # Join weights back to the dataset
+# sed_stat <- sed_stat %>%
+#   left_join(class_var, by = "Pesticide_Class")
+# 
+# sed_stat$weight <- sed_stat$weight / max(sed_stat$weight)
+# 
+# model <- glmmTMB(Concentration ~ Treatment * Week * Pesticide_Class
+#                  + (1 | Flume) , 
+#                  data = sed_stat, 
+#                  family = Gamma(link = "log"))
+# 
+# summary(model)
+# diagnose(model)
+# testDispersion(model)
+# res_sim = simulateResiduals(model, plot = T)
+# plotResiduals(res_sim, sed_stat$Pesticide_Class)
+# #testOutliers(res_sim)
+# #testQuantiles(res_sim)
+# print(res_sim)
+# plot(res_sim)
+# plotQQunif(res_sim)
+# plotResiduals(res_sim)
+# Anova(fit_sed, type = 2)
 #ft_tet = dredge(fit_sed,beta = "sd",
 #                 evaluate = T, rank = AICc)
 # print(ft_tet)
@@ -823,7 +989,7 @@ p_result = print(pairwise_comparisons)
 
 write.xlsx(p_result, "./plot/pesticide.xlsx")
 
-citation("performance")
+#citation("performance")
 
 #Marginal R² (R²_m = 0.385): This indicates that 39% of the variance in the response variable is explained by the fixed effects alone.
 #Conditional R² (R²_c = 0.884): This indicates that 88% of the variance is explained by both fixed and random effects combined.
