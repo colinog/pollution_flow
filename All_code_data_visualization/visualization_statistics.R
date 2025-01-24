@@ -213,6 +213,9 @@ testResiduals(res_sim) ##This generate all plot and values of all diagnosis test
 plotResiduals(res_sim)
 plot(res_sim)
 
+##Type 2 Anova
+Anova(fit_, type="II")
+
 emmeans(fit_, specs = pairwise ~ Treatment,
         adjust = "bonferroni", type = "response")
 
@@ -240,7 +243,7 @@ plot(auto_cor_bio, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 # Perform Ljung-Box test on residuals to confirm when necessary
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
 
-fit_1 = glmmTMB(mass_flux ~ Treatment * Week * Size.group + 
+fit_1 = glmmTMB(mass_flux ~ Treatment + Week + 
                   (1 | Flume) + ar1(Week+0|Flume),
                 data = p_sample,
                 family = Gamma(link = "log")) ##fit the final model with Gamma log link function
@@ -256,6 +259,10 @@ plotQQunif(res_sim)
 plotResiduals(res_sim)
 plot(res_sim)
 
+##Type 2 Anova 
+Anova(fit_1, type="II")
+
+##Pairwise comparison because the factor #Week is significant
 
 emmeans(fit_1, specs = pairwise ~ Treatment,
         adjust = "bonferroni", type = "response")
@@ -345,7 +352,12 @@ plot(res_sim)
 plotQQunif(res_sim)
 plotResiduals(res_sim)
 
+performance::test_performance(fit_sed)
 
+#Fit type 2 Anova
+Anova(fit_sed, type="II") #The factors were not significant 
+
+#I can continue with the pairwise comparison or report the summary of the glmm model
 mt = emmeans(fit_sed, specs = pairwise ~ Treatment,
             adjust = "bonferroni", type = "response")
 
