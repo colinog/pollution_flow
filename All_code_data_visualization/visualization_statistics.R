@@ -474,7 +474,6 @@ avg_wtw = wtw_1 |> ##Below, I rename the row to correct overlapping name for ana
 #write.table(avg_wtw, file = "avg_wtw.txt", row.names = FALSE, sep = "\t", quote = FALSE)
 
 sum_phch = phch_1 |>
-sum_phch = phch_1 |> 
   filter(phase %in% "colonization") |> ##I use colonization phase as it it was during the experimental phase
   dplyr::mutate(across(Flume, factor)) |>
   group_by(location, treatment) |> 
