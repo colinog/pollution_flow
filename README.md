@@ -2,7 +2,13 @@
 
 This repository contains data and r code for the manuscript (Flow reduction affects subsidy of riparian ecosystem by contaminated streams: evidence from a mesocosm study) to be submitted for publication.
 
-Wriiten by Collins Ogbeide, reviewed by 
+Wriiten by Collins Ogbeide, 
+
+      reviewed by: 
+
+Affilliation: 
+
+      iES Landau, Institute for Environmental Sciences, RPTU Kaiserslautern-Landau
 
 Content overview:
 
