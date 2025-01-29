@@ -10,9 +10,91 @@ library(emmeans)
 library(rstatix)
 
 ##### Data visualization ########
+#I included the daily pesticide class fluctuation
+#for the entry into the flumes
+##### Pesticide concentration in water ########
+pest_water = readRDS("All_code_data_visualization/pesticide_water.rds")
 
-abu_bio = readRDS("All_code_data_visualization/dry_sample.rds") #read in emergence and biomass data
+####Time series plot of daily pesticide concentration in water ######
 pj = position_dodge(width = 0.3)
+pest_water |> 
+  filter(!Concentration_µg_L %in% c("<LOQ", NA)) |> #exclude where conc. is <LOQ and NA
+  mutate(across(c(Concentration_µg_L, LOQ), as.numeric)) |> # convert the column to numeric variable
+  filter(!Class %in% "Metabolite") |> # exclude were class was metabolite
+  rstatix::group_by(date, Class) |> # group by date and pesticide class
+  rstatix::get_summary_stats(Concentration_µg_L, type = "full") |> #summarise by concentration
+  ggplot(aes(date, median,  shape = Class, group = Class))+
+  geom_line()+
+  geom_point()+
+  scale_shape_manual(values = c(5,6,7))+
+  labs(y = "Median pesticide concentrations (µg/L)", x = "Sampling days")+
+  facet_grid(Class~.)+ #Separated by pesticide class with same y axis value
+  scale_x_date(breaks = seq(min(pest_water$date), max(pest_water$date), by = "6 days"), #date sequence showing every six days
+               labels = function(x) format(x, "%d-%b")  # Show only month and day
+  )+
+  geom_vline(
+    xintercept = as.Date("2021-06-15"),  # Add a vertical line at 15 June
+    linetype = "dashed", color = "black"   # Customize the line appearance
+  ) +
+  annotate(
+    "text", 
+    x = as.Date("2021-06-15"), y = 0.08,  # Position the text on the plot
+    label = "Start of Low-flow", 
+    angle = 90, hjust = 1.2, vjust = -0.5, size = 4, color = "black"
+  )+
+  theme(panel.background = element_blank(),
+        strip.text.y =  element_text(angle = 90, size = 11, face = "bold"),
+        axis.line = element_line(color = "black"), 
+        axis.title.y = element_text(face = "bold"),
+        axis.title = element_text(size = 12, color = "black",
+                                  face = "bold"),
+        axis.text = element_text(size = 12, face = "bold", color = "black"),
+        legend.position = "bottom",
+        legend.text = element_text(size = 11, face = "bold", color = "black"),
+        legend.title = element_text(size = 11),
+        plot.tag = element_text(face = "bold"),
+  )
+
+ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22, height = 18, units = "cm")
+
+####### Pesticide concentration in sediment under control and low-flow treatments
+
+sed_pest = readRDS("All_code_data_visualization/sediment_pesticide.rds")
+
+#####Visualize by mean pesticide concentration under control and low-flow
+#The treatment column is a categorical variable with control (C) and low-flow (D)
+sed_pest |> 
+  dplyr::group_by(Treatment, Week) |> 
+  rstatix::get_summary_stats(Concentration_µg_kg, type = "full")|> 
+  ggplot(aes(Treatment, mean, fill = Week, shape = Week, linetype = Week))+
+  geom_point(position = pj, size = 3, color = "black")+
+  geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), 
+                width = 0.1, position = pj, color = "black") +
+  scale_shape_manual(values = c(5,6))+ #shape by treatment in week 4 and 6
+  ylim(0, 2.5)+ #y-axis limit
+  scale_x_discrete(labels = c("Control", "Low-flow"))+
+  labs(y = expression(bold("Mean pesticide concentration (µg kg"^-1*")")), 
+       x = "Treatment")+
+  theme(
+    panel.background = element_blank(),
+    axis.line = element_line(color = "black"), 
+    axis.title.y = element_text(face = "bold"),
+    axis.title = element_text(size = 12, color = "black",
+                              face = "bold"),
+    axis.text = element_text(size = 12, face = "bold", color = "black"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 12, face = "bold", color = "black"),
+    legend.title = element_text(size = 12),
+    plot.tag = element_text(face = "bold"),
+  )
+
+ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
+
+
+#####Wet emergence sample collected over five weeks #########
+
+abu_bio = readRDS("All_code_data_visualization/wet_sample.rds") #read in emergence and biomass data
+
 ######### standardise abundance visualization ##############
 abu_bio |> 
   dplyr::group_by(Treatment, Week) |>  #group by Treatment and Week
@@ -101,86 +183,62 @@ spider_dat |>
 
 ggsave("All_code_data_visualization/plot/spider.png", dpi = 300, width = 15, height = 12, units = "cm")
 
-##### Pesticide concentration in water ########
-
-pest_water = readRDS("All_code_data_visualization/pesticide_water.rds")
-
-####Time series plot of daily pesticide concentration in water ######
-
-pest_water |> 
-  filter(!Concentration_µg_L %in% c("<LOQ", NA)) |> #exclude where conc. is <LOQ and NA
-  mutate(across(c(Concentration_µg_L, LOQ), as.numeric)) |> # convert the column to numeric variable
-  filter(!Class %in% "Metabolite") |> # exclude were class was metabolite
-  rstatix::group_by(date, Class) |> # group by date and pesticide class
-  rstatix::get_summary_stats(Concentration_µg_L, type = "full") |> #summarise by concentration
-  ggplot(aes(date, median,  shape = Class, group = Class))+
-  geom_line()+
-  geom_point()+
-  scale_shape_manual(values = c(5,6,7))+
-  labs(y = "Median pesticide concentrations (µg/L)", x = "Sampling days")+
-  facet_grid(Class~.)+ #Separated by pesticide class with same y axis value
-  scale_x_date(breaks = seq(min(pest_water$date), max(pest_water$date), by = "6 days"), #date sequence showing every six days
-               labels = function(x) format(x, "%d-%b")  # Show only month and day
-  )+
-  geom_vline(
-    xintercept = as.Date("2021-06-15"),  # Add a vertical line at 15 June
-    linetype = "dashed", color = "black"   # Customize the line appearance
-  ) +
-  annotate(
-    "text", 
-    x = as.Date("2021-06-15"), y = 0.08,  # Position the text on the plot
-    label = "Start of Low-flow", 
-    angle = 90, hjust = 1.2, vjust = -0.5, size = 4, color = "black"
-  )+
-  theme(panel.background = element_blank(),
-        strip.text.y =  element_text(angle = 90, size = 11, face = "bold"),
-        axis.line = element_line(color = "black"), 
-        axis.title.y = element_text(face = "bold"),
-        axis.title = element_text(size = 12, color = "black",
-                                  face = "bold"),
-        axis.text = element_text(size = 12, face = "bold", color = "black"),
-        legend.position = "bottom",
-        legend.text = element_text(size = 11, face = "bold", color = "black"),
-        legend.title = element_text(size = 11),
-        plot.tag = element_text(face = "bold"),
-  )
-
-ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22, height = 18, units = "cm")
-
-####### Pesticide concentration in sediment under control and low-flow treatments
-
-sed_pest = readRDS("All_code_data_visualization/sediment_pesticide.rds")
-
-#####Visualize by mean pesticide concentration under control and low-flow
-#The treatment column is a categorical variable with control (C) and low-flow (D)
-sed_pest |> 
-  dplyr::group_by(Treatment, Week) |> 
-  rstatix::get_summary_stats(Concentration_µg_kg, type = "full")|> 
-  ggplot(aes(Treatment, mean, fill = Week, shape = Week, linetype = Week))+
-  geom_point(position = pj, size = 3, color = "black")+
-  geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), 
-                width = 0.1, position = pj, color = "black") +
-  scale_shape_manual(values = c(5,6))+ #shape by treatment in week 4 and 6
-  ylim(0, 2.5)+ #y-axis limit
-  scale_x_discrete(labels = c("Control", "Low-flow"))+
-  labs(y = expression(bold("Mean pesticide concentration (µg kg"^-1*")")), 
-       x = "Treatment")+
-  theme(
-    panel.background = element_blank(),
-    axis.line = element_line(color = "black"), 
-    axis.title.y = element_text(face = "bold"),
-    axis.title = element_text(size = 12, color = "black",
-                              face = "bold"),
-    axis.text = element_text(size = 12, face = "bold", color = "black"),
-    legend.position = "bottom",
-    legend.text = element_text(size = 12, face = "bold", color = "black"),
-    legend.title = element_text(size = 12),
-    plot.tag = element_text(face = "bold"),
-  )
-
-ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
 
 ######Statistical analysis of all tested hypothesis ######
+####################Sediment Pesticide Concentration########################
+sed_pest$Concentration <- 1/sqrt(sed_pest$Concentration_µg_kg) 
+#inverse square root transformation of response variable concentration
+#because initial model with the variable was not normally distributed
+fp = glmmTMB(Concentration ~  Treatment + Week
+             + (1|Flume),
+             data = sed_pest) 
+##initial model to check for spatial autocorrelation
+
+res_pest <- residuals(fp) #extract residual from model
+###calculate and plot the acf residuals
+auto_cor_pest <- acf(res_pest, lag.max=40, plot=FALSE)
+plot(auto_cor_pest, main="ACF of Residuals", xlab="Lag", ylab="ACF")
+
+# Perform Ljung-Box test on residuals to confirm when necessary
+Box.test(residuals, lag = 20, type = "Ljung-Box")
+
+fit_sed = glmmTMB(Concentration ~  Treatment + Week
+                  + (1|Flume) + ar1(Week + 0|Flume),
+                  dispformula = ~Week, ##Week was added as dispersion factor
+                  data = sed_pest, family = Gamma(link = "log"))
+
+##The interaction terms were not significant in the initial model
+
+
+summary(fit_sed)
+diagnose(fit_sed)
+testDispersion(fit_sed)
+res_sim = simulateResiduals(fit_sed, plot = T)
+print(res_sim)
+testResiduals(res_sim)
+plot(res_sim)
+plotQQunif(res_sim)
+plotResiduals(res_sim)
+
+performance::test_performance(fit_sed)
+
+#Fit type 2 Anova
+Anova(fit_sed, type="II") #The factors were not significant 
+
+#I can continue with the pairwise comparison or report the summary of the glmm model
+mt = emmeans(fit_sed, specs = pairwise ~ Treatment,
+             adjust = "bonferroni", type = "response")
+
+mt$contrasts %>%
+  rbind() 
+
+mtw = emmeans(fit_sed, specs = pairwise ~ Week|Treatment,
+              adjust = "bonferroni", type = "response")
+
+mtw$contrasts %>%
+  rbind() 
+#Pairwise comparison within treatment across week4 and week 6
+
 ####Emergence data for both mass flux and emergence rate
 f = glmmTMB(CPUE ~ Treatment + Week +
               (1 | Flume),
@@ -198,6 +256,7 @@ plot(auto_cor_ab, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
 
 ##run the model with sampling time and ar1, the interaction terms were not significant
+
 fit_ = glmmTMB(CPUE ~ Treatment + Week +
                  (1 | Flume) + ar1(Week+0|Flume), #sparial autocorrelation structure
                data = p_sample,
@@ -214,10 +273,11 @@ plotResiduals(res_sim)
 plot(res_sim)
 
 ##Type 2 Anova
-Anova(fit_, type="II")
+Anova(fit_, type="II") #Only the fixed factor week was significant
 
 emmeans(fit_, specs = pairwise ~ Treatment,
-        adjust = "bonferroni", type = "response")
+        adjust = "bonferroni", type = "response") 
+#Pairwise comparison of the treatment
 
 m_c = emmeans(fit_, specs = pairwise ~ Week|Treatment,
               adjust = "bonferroni", type = "response")
@@ -242,8 +302,8 @@ plot(auto_cor_bio, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 
 # Perform Ljung-Box test on residuals to confirm when necessary
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
-
-fit_1 = glmmTMB(mass_flux ~ Treatment + Week + 
+names(p_sample)
+fit_1 = glmmTMB(mass_flux ~ Treatment + Week +
                   (1 | Flume) + ar1(Week+0|Flume),
                 data = p_sample,
                 family = Gamma(link = "log")) ##fit the final model with Gamma log link function
@@ -316,60 +376,7 @@ sp_e$contrasts %>%
 # result = print(pairwise_comparisons)
 
 
-####################Sediment Pesticide Concentration########################
 
-sed_pest$Concentration <- 1/sqrt(sed_pest$Concentration_µg_kg) 
-#inverse square root transformation of response variable concentration
-#because initial model with the variable was not normally distributed
-fp = glmmTMB(Concentration ~  Treatment + Week
-             + (1|Flume),
-             data = sed_pest) 
-##initial model to check for spatial autocorrelation
-
-res_pest <- residuals(fp) #extract residual from model
-###calculate and plot the acf residuals
-auto_cor_pest <- acf(res_pest, lag.max=40, plot=FALSE)
-plot(auto_cor_pest, main="ACF of Residuals", xlab="Lag", ylab="ACF")
-
-# Perform Ljung-Box test on residuals to confirm when necessary
-Box.test(residuals, lag = 20, type = "Ljung-Box")
-
-fit_sed = glmmTMB(Concentration ~  Treatment + Week
-                  + (1|Flume) + ar1(Week + 0|Flume),
-                  dispformula = ~Week, ##Week was added as dispersion factor
-                  data = sed_pest, family = Gamma(link = "log"))
-
-##The interaction terms were not significant in the initial model
-
-
-summary(fit_sed)
-diagnose(fit_sed)
-testDispersion(fit_sed)
-res_sim = simulateResiduals(fit_sed, plot = T)
-print(res_sim)
-testResiduals(res_sim)
-plot(res_sim)
-plotQQunif(res_sim)
-plotResiduals(res_sim)
-
-performance::test_performance(fit_sed)
-
-#Fit type 2 Anova
-Anova(fit_sed, type="II") #The factors were not significant 
-
-#I can continue with the pairwise comparison or report the summary of the glmm model
-mt = emmeans(fit_sed, specs = pairwise ~ Treatment,
-            adjust = "bonferroni", type = "response")
-
-mt$contrasts %>%
-  rbind() 
-
-mtw = emmeans(fit_sed, specs = pairwise ~ Week|Treatment,
-            adjust = "bonferroni", type = "response")
-
-mtw$contrasts %>%
-  rbind() 
-#Pairwise comparison within treatment across week4 and week 6
 
 #####Physical chemical properties measured by Verena and Gemma########
 # phch_1 = openxlsx::read.xlsx("../Verena_Schreiner/RSM_2021_phch.xlsx", 
@@ -467,7 +474,7 @@ avg_wtw = wtw_1 |> ##Below, I rename the row to correct overlapping name for ana
 #write.table(avg_wtw, file = "avg_wtw.txt", row.names = FALSE, sep = "\t", quote = FALSE)
 
 a = phch_1 |> 
-  filter(phase %in% "colonization") |> ##I use colonization phase as it it was closer to the experimental phase
+  filter(phase %in% "treatment") |> ##I use colonization phase as it it was closer to the experimental phase
   group_by(location) |> 
   rstatix::get_summary_stats(type = "mean_se") #estimation of the max velocity and depth in inlet and outlet stretch
 
