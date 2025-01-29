@@ -473,9 +473,10 @@ avg_wtw = wtw_1 |> ##Below, I rename the row to correct overlapping name for ana
 
 #write.table(avg_wtw, file = "avg_wtw.txt", row.names = FALSE, sep = "\t", quote = FALSE)
 
-a = phch_1 |> 
+sum_phch = phch_1 |>
   filter(phase %in% "colonization") |> ##I use colonization phase as it it was during the experimental phase
-  group_by(location) |> 
+  dplyr::mutate(across(Flume, factor)) |>
+  group_by(location, treatment) |> 
   rstatix::get_summary_stats(type = "mean_se") #estimation of the max velocity and depth in inlet and outlet stretch
 
 phch = phch_1 |> 
