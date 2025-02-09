@@ -15,6 +15,18 @@ library(rstatix)
 ##### Pesticide concentration in water ########
 pest_water = readRDS("All_code_data_visualization/pesticide_water.rds")
 
+#####Summary of pesticide concentration in water######
+
+water_sum = pest_water |> 
+  filter(!Concentration_µg_L %in% c("<LOQ", NA)) |> #exclude where conc. is <LOQ and NA
+  mutate(across(c(Concentration_µg_L, LOQ), as.numeric)) |> # convert the column to numeric variable
+  filter(!Class %in% "Metabolite") |> # exclude were class was metabolite
+  rstatix::group_by(Analyte, Class) |> # group by date and pesticide class
+  rstatix::get_summary_stats(Concentration_µg_L, type = "full") |>  #summarise by concentration
+  arrange(Class)
+  
+openxlsx::write.xlsx(water_sum, "All_code_data_visualization/95_pesticide/water_pest_sum.xlsx", rowNames = F)
+
 ####Time series plot of daily pesticide concentration in water ######
 pj = position_dodge(width = 0.3)
 pest_water |> 
@@ -60,8 +72,21 @@ ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22,
 ####### Pesticide concentration in sediment under control and low-flow treatments
 
 sed_pest = readRDS("All_code_data_visualization/sediment_pesticide.rds")
+#####Summary of sediment pesticide ###########
+sed_sum = sed_pest |> 
+  dplyr::group_by(Treatment,Class,Pesticides  ) |> 
+  rstatix::get_summary_stats(Concentration_µg_kg, type = "full") |> 
+  mutate(Treatment = case_when(
+    Treatment == "C" ~ "Control",
+    Treatment == "D" ~ "Low-flow",
+    TRUE ~ Treatment  # Keeps other values unchanged
+  ))
+
+openxlsx::write.xlsx(sed_sum, "All_code_data_visualization/95_pesticide/sed_pest_sum.xlsx", rowNames = F)
 
 #####Visualize by mean pesticide concentration under control and low-flow
+
+
 #The treatment column is a categorical variable with control (C) and low-flow (D)
 sed_pest |> 
   dplyr::group_by(Treatment, Week) |> 
@@ -90,6 +115,11 @@ sed_pest |>
 
 ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
 
+# library(ggridges)
+# ggplot(sed_pest, aes(x = Concentration_µg_kg, y = Class, fill = Class)) + 
+#   geom_density_ridges(rel_min_height = 0.01)+
+#   scale_fill_viridis_d()+
+#   theme(legend.position = "none")
 
 #####Wet emergence sample collected over five weeks #########
 
@@ -187,13 +217,16 @@ ggsave("All_code_data_visualization/plot/spider.png", dpi = 300, width = 15, hei
 ######Statistical analysis of all tested hypothesis ######
 ####################Sediment Pesticide Concentration########################
 sed_pest$Concentration <- 1/sqrt(sed_pest$Concentration_µg_kg) 
+
 #inverse square root transformation of response variable concentration
 #because initial model with the variable was not normally distributed
+
 fp = glmmTMB(Concentration ~  Treatment + Week
              + (1|Flume),
-             data = sed_pest) 
-##initial model to check for spatial autocorrelation
+             data = sed_pest, Gamma(link = "log")) 
+summary(fp)
 
+##initial model to check for spatial autocorrelation
 res_pest <- residuals(fp) #extract residual from model
 ###calculate and plot the acf residuals
 auto_cor_pest <- acf(res_pest, lag.max=40, plot=FALSE)
@@ -206,7 +239,7 @@ fit_sed = glmmTMB(Concentration ~  Treatment + Week
                   + (1|Flume) + ar1(Week + 0|Flume),
                   dispformula = ~Week, ##Week was added as dispersion factor
                   data = sed_pest, family = Gamma(link = "log"))
-
+##
 ##The interaction terms were not significant in the initial model
 
 
@@ -220,24 +253,24 @@ plot(res_sim)
 plotQQunif(res_sim)
 plotResiduals(res_sim)
 
-performance::test_performance(fit_sed)
 
 #Fit type 2 Anova
-Anova(fit_sed, type="II") #The factors were not significant 
+#Anova(fit_sed, type="II") #The factors were not significant 
 
 #I can continue with the pairwise comparison or report the summary of the glmm model
-mt = emmeans(fit_sed, specs = pairwise ~ Treatment,
-             adjust = "bonferroni", type = "response")
+# mt = emmeans(fit_sed, specs = pairwise ~ Treatment,
+#              adjust = "bonferroni", type = "response")
+# 
+# mt$contrasts %>%
+#   rbind() 
+# 
+# mtw = emmeans(fit_sed, specs = pairwise ~ Week|Treatment,
+#               adjust = "bonferroni", type = "response")
+# 
+# mtw$contrasts %>%
+#   rbind() 
 
-mt$contrasts %>%
-  rbind() 
 
-mtw = emmeans(fit_sed, specs = pairwise ~ Week|Treatment,
-              adjust = "bonferroni", type = "response")
-
-mtw$contrasts %>%
-  rbind() 
-#Pairwise comparison within treatment across week4 and week 6
 
 ####Emergence data for both mass flux and emergence rate
 f = glmmTMB(CPUE ~ Treatment + Week +
@@ -284,6 +317,9 @@ m_c = emmeans(fit_, specs = pairwise ~ Week|Treatment,
 
 m_c$contrasts %>%
   rbind() 
+
+write.xlsx(m_c$contrasts %>%
+             rbind(),"All_code_data_visualization/95_pesticide/cpue.xlsx" )
 ##The pairwise comparison within specific treatment across weeks 
 
 #########Biomass flux#####
@@ -302,7 +338,7 @@ plot(auto_cor_bio, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 
 # Perform Ljung-Box test on residuals to confirm when necessary
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
-names(p_sample)
+
 fit_1 = glmmTMB(mass_flux ~ Treatment + Week +
                   (1 | Flume) + ar1(Week+0|Flume),
                 data = p_sample,
@@ -332,7 +368,8 @@ m_f = emmeans(fit_1, specs = pairwise ~ Week|Treatment,
 
 m_f$contrasts %>%
   rbind() 
-
+write.xlsx(m_f$contrasts %>%
+             rbind(),"All_code_data_visualization/95_pesticide/mass.xlsx" )
 ########Spider count model#######
 
 fit_sp = glmmTMB(count ~  Treatment * Family + (1|Flume), 
@@ -469,20 +506,29 @@ avg_wtw = wtw_1 |> ##Below, I rename the row to correct overlapping name for ana
   ) |> 
   dplyr::group_by(Treatment, location) |>
   #mutate_if(is.numeric, round, digits = 3) |> 
-  rstatix::get_summary_stats(type = "mean_se") ##mean_se for mean and standard error
+  rstatix::get_summary_stats(type = "full") ##mean_se for mean and standard error
 
-#write.table(avg_wtw, file = "avg_wtw.txt", row.names = FALSE, sep = "\t", quote = FALSE)
+openxlsx::write.xlsx(avg_wtw,"All_code_data_visualization/95_pesticide/avg_wtw.xlsx" )
+
 
 sum_phch = phch_1 |>
-  filter(phase %in% "colonization") |> ##I use colonization phase as it it was during the experimental phase
+  filter(phase %in% "Treatment") |> ##I use treatment phase as it was during the experimental phase
   dplyr::mutate(across(Flume, factor)) |>
   group_by(location, treatment) |> 
-  rstatix::get_summary_stats(type = "mean_se") #estimation of the max velocity and depth in inlet and outlet stretch
+  rstatix::get_summary_stats(type = "full") |>  #estimation of the max velocity and depth in inlet and outlet stretch
+  mutate(treatment = case_when(
+    treatment == "C" ~ "Control",
+    treatment == "D" ~ "Low-flow",
+    TRUE ~ treatment  # Keeps other values unchanged
+  )) |> 
+  arrange(treatment, location)
+openxlsx::write.xlsx(sum_phch,"All_code_data_visualization/95_pesticide/avg_phch.xlsx" )
 
-phch = phch_1 |> 
+####For estimation of maximum flow velocity in the stream before the start of the experiment####
+phch = phch_1 |>
   filter(phase %in% "colonization") |>
-  dplyr::mutate(across(c(Flume), as.factor)) |> 
-  dplyr::group_by(location,treatment) |> 
+  dplyr::mutate(across(c(Flume), as.factor)) |>
+  dplyr::group_by(location,treatment) |>
   rstatix::get_summary_stats(type = "mean_se")
 
 
