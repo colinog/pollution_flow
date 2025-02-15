@@ -554,7 +554,7 @@ openxlsx::write.xlsx(avg_wtw,"All_code_data_visualization/95_pesticide/avg_wtw.x
 
 
 sum_phch = phch_1 |>
-  filter(phase %in% "Treatment") |> ##I use treatment phase as it was during the experimental phase
+  filter(phase %in% "treatment") |> ##I use treatment phase as it was during the experimental phase
   dplyr::mutate(across(Flume, factor)) |>
   group_by(location, treatment) |> 
   rstatix::get_summary_stats(type = "full") |>  #estimation of the max velocity and depth in inlet and outlet stretch
@@ -571,7 +571,7 @@ phch = phch_1 |>
   filter(phase %in% "colonization") |>
   dplyr::mutate(across(c(Flume), as.factor)) |>
   dplyr::group_by(location,treatment) |>
-  rstatix::get_summary_stats(type = "mean_se")
+  rstatix::get_summary_stats(type = "full")
 
 
 ##write.table(phch, file = "phch.txt", row.names = FALSE, sep = "\t", quote = FALSE)
