@@ -8,7 +8,7 @@ library(DHARMa)
 library(car)
 library(emmeans)
 library(rstatix)
-pj = position_dodge(width = 0.3)
+
 
 ##### Data visualization ########
 #I included the daily pesticide class fluctuation
@@ -89,6 +89,8 @@ openxlsx::write.xlsx(sed_sum, "All_code_data_visualization/95_pesticide/sed_pest
 
 #####Visualize by mean pesticide concentration under control and low-flow
 
+# Adjust the position of elements to avoid overlap by slightly shifting them horizontally
+pj = position_dodge(width = 0.3)
 
 #The treatment column is a categorical variable with control (C) and low-flow (D)
 sed_pest |> 
@@ -155,6 +157,11 @@ print(p_diff) #
 abu_bio = readRDS("All_code_data_visualization/Data/wet_sample.rds") #read in emergence and biomass data
 
 ######### standardise abundance visualization ##############
+
+
+pd = position_dodge(width = 0.1) 
+# Adjust the position of elements to avoid overlap by slightly shifting them horizontally
+
 abu_bio |> 
   dplyr::group_by(Treatment, Week) |>  #group by Treatment and Week
   rstatix::get_summary_stats(CPUE, type = "full")|> # summarise abundance using catch per unit effort (CPUE) z
@@ -221,9 +228,9 @@ spider_dat |>
   rstatix::get_summary_stats(count, type = "full")|> # summarize by the spider count
   ggplot(aes(Treatment, mean, fill = Family, color = Family, 
              shape = Family, linetype = Family))+
-  geom_point(position = pj, size = 3, color = "black")+
+  geom_point(position = pd, size = 3, color = "black")+
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
-                width = 0.1, position = pj, color = "black") +
+                width = 0.1, position = pd, color = "black") +
   ylim(0, 50)+
   scale_shape_manual(values = c(0,8))+
   labs(y = "Mean abundance per riparian area", x = "Treatment")+
