@@ -14,7 +14,7 @@ pj = position_dodge(width = 0.3)
 #I included the daily pesticide class fluctuation
 #for the entry into the flumes
 ##### Pesticide concentration in water ########
-pest_water = readRDS("All_code_data_visualization/pesticide_water.rds")
+pest_water = readRDS("All_code_data_visualization/Data/pesticide_water.rds")
 
 #####Summary of pesticide concentration in water######
 
@@ -74,7 +74,7 @@ ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22,
 
 ####### Pesticide concentration in sediment under control and low-flow treatments
 
-sed_pest = readRDS("All_code_data_visualization/sediment_pesticide.rds")
+sed_pest = readRDS("All_code_data_visualization/Data/sediment_pesticide.rds")
 #####Summary of sediment pesticide ###########
 sed_sum = sed_pest |> 
   dplyr::group_by(Treatment,Class,Pesticides  ) |> 
@@ -152,7 +152,7 @@ print(p_diff) #
 
 #####Wet emergence sample collected over five weeks #########
 
-abu_bio = readRDS("All_code_data_visualization/wet_sample.rds") #read in emergence and biomass data
+abu_bio = readRDS("All_code_data_visualization/Data/wet_sample.rds") #read in emergence and biomass data
 
 ######### standardise abundance visualization ##############
 abu_bio |> 
@@ -214,7 +214,7 @@ abu_bio |>
 ggsave("All_code_data_visualization/plot/biomass.png", dpi = 300, width = 15, height = 12, units = "cm")
 ###### spider abundance #########
 
-spider_dat = readRDS("All_code_data_visualization/spider_data.rds")
+spider_dat = readRDS("All_code_data_visualization/Data/spider_data.rds")
 
 spider_dat |> 
   dplyr::group_by(Treatment,Family) |> # group by Treatment and Family
@@ -464,7 +464,7 @@ sp_e$contrasts %>%
 # 
 # saveRDS(phch_1,"Data/RSM_2021_phch.rds" )
 
-phch_1 = readRDS("All_code_data_visualization/RSM_2021_phch.rds")
+phch_1 = readRDS("All_code_data_visualization/Data/RSM_2021_phch.rds")
 ##I removed flume 3,8,12, and 15 which was not included in low-flow experiment
 
 # wtw_1 = readxl::read_excel("../Verena_Schreiner/RSM_2021_phch.xlsx", 
@@ -477,7 +477,7 @@ phch_1 = readRDS("All_code_data_visualization/RSM_2021_phch.rds")
 # 
 # saveRDS(wtw_1,"Data/wtw.rds")
 
-wtw_1 = readRDS("All_code_data_visualization/wtw.rds")
+wtw_1 = readRDS("All_code_data_visualization/Data/wtw.rds")
 
 ##I excluded the month of May and September data,Low-flow was June to July
 
@@ -554,7 +554,7 @@ openxlsx::write.xlsx(avg_wtw,"All_code_data_visualization/95_pesticide/avg_wtw.x
 
 
 sum_phch = phch_1 |>
-  filter(phase %in% "treatment") |> ##I use treatment phase as it was during the experimental phase
+  filter(phase %in% "Treatment") |> ##I use treatment phase as it was during the experimental phase
   dplyr::mutate(across(Flume, factor)) |>
   group_by(location, treatment) |> 
   rstatix::get_summary_stats(type = "full") |>  #estimation of the max velocity and depth in inlet and outlet stretch
@@ -571,7 +571,7 @@ phch = phch_1 |>
   filter(phase %in% "colonization") |>
   dplyr::mutate(across(c(Flume), as.factor)) |>
   dplyr::group_by(location,treatment) |>
-  rstatix::get_summary_stats(type = "full")
+  rstatix::get_summary_stats(type = "mean_se")
 
 
 ##write.table(phch, file = "phch.txt", row.names = FALSE, sep = "\t", quote = FALSE)
