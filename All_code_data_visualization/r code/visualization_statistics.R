@@ -1,6 +1,3 @@
-#gitcreds::gitcreds_set()
-#theme_set(theme_bw())
-#renv::snapshot()
 library(tidyverse)
 library(glmmTMB)  
 library(openxlsx)
@@ -8,6 +5,10 @@ library(DHARMa)
 library(car)
 library(emmeans)
 library(rstatix)
+names(emerg_insect)
+the_third = emerg_insect |> 
+  dplyr::filter(!Sampling %in% "Active") |> 
+  dplyr::filter(mg.pro.Ind %in% NA)
 
 
 ##### Data visualization ########
@@ -22,7 +23,7 @@ water_sum = pest_water |>
   filter(!Concentration_µg_L %in% c("<LOQ", NA)) |> #exclude where conc. is <LOQ and NA
   mutate(across(c(Concentration_µg_L, LOQ), as.numeric)) |> # convert the column to numeric variable
   filter(!Class %in% "Metabolite") |> # exclude were class was metabolite
-  rstatix::group_by(Analyte, Class) |> # group by date and pesticide class
+  rstatix::group_by(Analyte, Class, LOQ) |> # group by date and pesticide class
   rstatix::get_summary_stats(Concentration_µg_L, type = "full") |>  #summarise by concentration
   arrange(Class)
   
@@ -38,24 +39,26 @@ pest_water |>
   filter(!Class %in% "Metabolite") |> # exclude were class was metabolite
   rstatix::group_by(date, Class) |> # group by date and pesticide class
   rstatix::get_summary_stats(Concentration_µg_L, type = "full") |> #summarise by concentration
-  ggplot(aes(date, median,  shape = Class, group = Class))+
-  geom_line()+
-  geom_point()+
-  scale_shape_manual(values = c(5,6,7))+
-  labs(y = "Median pesticide concentrations (µg/L)", x = "Sampling days")+
-  facet_grid(Class~.)+ #Separated by pesticide class with same y axis value
-  scale_x_date(breaks = seq(min(pest_water$date), max(pest_water$date), by = "6 days"), #date sequence showing every six days
+  ggplot(aes(date, median, group = Class, shape = Class))+
+  geom_line(size = 0.5, alpha = 0.7)+
+  geom_point(size = 2.5)+
+  scale_shape_manual(values = c(15, 17, 8))+
+  labs(y = "Median pesticide concentrations (µg/L)", x = "Sampling days",
+       shape = "Pesticide class:")+
+  #facet_grid(Class~.)+ #Separated by pesticide class with same y axis value
+  scale_x_date(breaks = seq(min(pest_water$date), max(pest_water$date), by = "5 days"), #date sequence showing every six days
                labels = function(x) format(x, "%d-%b")  # Show only month and day
   )+
   geom_vline(
     xintercept = as.Date("2021-06-15"),  # Add a vertical line at 15 June
-    linetype = "dashed", color = "black"   # Customize the line appearance
+    linetype = "dashed", color = "black",   # Customize the line appearance
+    linewidth = 0.8
   ) +
   annotate(
     "text", 
     x = as.Date("2021-06-15"), y = 0.08,  # Position the text on the plot
-    label = "Start of Low-flow", 
-    angle = 90, hjust = 1.2, vjust = -0.5, size = 4, color = "black"
+    label = "Start of Low-flow", fontface = "bold",
+    angle = 90, hjust = 2.0, vjust = -0.5, size = 4, color = "black"
   )+
   theme(panel.background = element_blank(),
         strip.text.y =  element_text(angle = 90, size = 11, face = "bold"),
@@ -65,19 +68,23 @@ pest_water |>
                                   face = "bold"),
         axis.text = element_text(size = 12, face = "bold", color = "black"),
         legend.position = "bottom",
-        legend.text = element_text(size = 11, face = "bold", color = "black"),
-        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 12, face = "bold", color = "black"),
+        legend.title = element_text(size = 12),
         plot.tag = element_text(face = "bold"),
+        axis.title.x = element_text(margin = margin(t = 10))
   )
 
-ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22, height = 18, units = "cm")
+ggsave("All_code_data_visualization/plot/pest_water.png", dpi = 300, width = 22, height = 14, units = "cm")
 
 ####### Pesticide concentration in sediment under control and low-flow treatments
 
-sed_pest = readRDS("All_code_data_visualization/Data/sediment_pesticide.rds")
+sed_pest = readRDS("All_code_data_visualization/Data/sediment_pesticide.rds") |> 
+  mutate(Treatment = case_when(Treatment == "C" ~ "Control",
+                               Treatment == "D" ~ "Low-flow",
+                               TRUE ~Treatment))
 #####Summary of sediment pesticide ###########
 sed_sum = sed_pest |> 
-  dplyr::group_by(Treatment,Class,Pesticides  ) |> 
+  dplyr::group_by(Treatment,Class,Pesticides) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "full") |> 
   mutate(Treatment = case_when(
     Treatment == "C" ~ "Control",
@@ -87,24 +94,43 @@ sed_sum = sed_pest |>
 
 openxlsx::write.xlsx(sed_sum, "All_code_data_visualization/95_pesticide/sed_pest_sum.xlsx", rowNames = F)
 
+sed_wk = sed_pest |> 
+  dplyr::group_by(Treatment,Week) |> 
+  rstatix::get_summary_stats(Concentration_µg_kg, type = "mean_ci") |> 
+  mutate(Treatment = case_when(
+    Treatment == "C" ~ "Control",
+    Treatment == "D" ~ "Low-flow",
+    TRUE ~ Treatment  # Keeps other values unchanged
+  ))
+
+
 #####Visualize by mean pesticide concentration under control and low-flow
 
 # Adjust the position of elements to avoid overlap by slightly shifting them horizontally
 pj = position_dodge(width = 0.3)
 
 #The treatment column is a categorical variable with control (C) and low-flow (D)
+#Treatment, mean, fill = Week, shape = Week, linetype = Week
+
 sed_pest |> 
+  mutate(Week = case_when(
+    Week == "4" ~ "Week 4",
+    Week == "6" ~ "Week 6",
+    TRUE ~ Week  # Keeps other values unchanged
+  )) |> 
   dplyr::group_by(Treatment, Week) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "full")|> 
-  ggplot(aes(Treatment, mean, fill = Week, shape = Week, linetype = Week))+
+  ggplot(aes(Week, mean, shape = Week, linetype = Week))+
   geom_point(position = pj, size = 3, color = "black")+
   geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), 
                 width = 0.1, position = pj, color = "black") +
-  scale_shape_manual(values = c(5,6))+ #shape by treatment in week 4 and 6
+  scale_shape_manual(values = c(19,2))+ #shape by treatment in week 4 and 6
   ylim(0, 2.5)+ #y-axis limit
-  scale_x_discrete(labels = c("Control", "Low-flow"))+
-  labs(y = expression(bold("Mean pesticide concentration (µg kg"^-1*")")), 
-       x = "Treatment")+
+  #scale_x_discrete(labels = c("Control", "Low-flow"))+
+  scale_linetype_manual(values = c("solid", "dashed"))+
+  facet_wrap(~Treatment)+
+  labs(y = expression(bold("Mean sediment pesticide concentrations (µg kg"^-1*")")), 
+       x = "Sampling week")+
   theme(
     panel.background = element_blank(),
     axis.line = element_line(color = "black"), 
@@ -116,9 +142,10 @@ sed_pest |>
     legend.text = element_text(size = 12, face = "bold", color = "black"),
     legend.title = element_text(size = 12),
     plot.tag = element_text(face = "bold"),
+    strip.text = element_text(face = "bold")
   )
 
-ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, height = 12, units = "cm")
+ggsave("All_code_data_visualization/plot/pest_sed_new.png", dpi = 300, width = 18, height = 14, units = "cm")
 
 ####### The mean sum concentration to estimate percentage difference ######
 #aggregate(Concentration_µg_kg ~ Treatment + Week, data = sed_pest, FUN = mean)
@@ -126,11 +153,7 @@ ggsave("All_code_data_visualization/plot/pest_sed.png", dpi = 300, width = 15, h
 avg_sum = sed_pest |> 
   dplyr::group_by(Treatment, Week) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "mean_ci")|> 
-  mutate(Treatment = case_when(
-    Treatment == "C" ~ "Control",
-    Treatment == "D" ~ "Low-flow"
-  )) |> 
-  mutate(Week = case_when(
+  dplyr::mutate(Week = case_when(
     Week == 4 ~ "Wk4",
     Week == 6 ~ "Wk6"
   ))
@@ -142,7 +165,7 @@ p_diff = avg_sum |>
   pivot_wider(names_from = Week, values_from = mean) |> 
   mutate(per_diff = (Wk6 - Wk4) / Wk4 * 100)
 
-print(p_diff) #
+print(p_diff) #The perventage differnce
 
 
 
@@ -162,7 +185,7 @@ abu_bio = readRDS("All_code_data_visualization/Data/wet_sample.rds") #read in em
 pd = position_dodge(width = 0.1) 
 # Adjust the position of elements to avoid overlap by slightly shifting them horizontally
 
-abu_bio |> 
+a =abu_bio |> 
   dplyr::group_by(Treatment, Week) |>  #group by Treatment and Week
   rstatix::get_summary_stats(CPUE, type = "full")|> # summarise abundance using catch per unit effort (CPUE) z
   ggplot(aes(Week,mean, fill = Treatment, color = Treatment, 
@@ -171,10 +194,11 @@ abu_bio |>
   geom_line(position = pd, color = "black", linewidth = 0.3)+
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
                 width = 0.1, position = pd, color = "black") +
-  scale_fill_viridis_d(option = "plasma")+
+  #scale_fill_viridis_d(option = "plasma")+
   scale_linetype_manual(values = c("solid", "dashed"))+
-  labs(y = expression(bold("Abundance (ind. m"^-2*" day"^-1*")")), 
+  labs(tag = "(a)", y = expression(bold("Abundance (ind. m"^-2*" day"^-1*")")), 
        x = expression(bold("Sampling Week")))+
+  
   theme(
     panel.background = element_blank(),
     axis.line = element_line(color = "black"), 
@@ -182,16 +206,18 @@ abu_bio |>
     axis.title = element_text(size = 13, color = "black",
                               face = "bold"),
     axis.text = element_text(size = 13, face = "bold", color = "black"),
-    legend.position = "bottom",
+    legend.position = "none",
     legend.text = element_text(size = 12, face = "bold", color = "black"),
     legend.title = element_text(size = 12),
     strip.text = element_text(size = 13, face = "bold"),
-    plot.tag = element_text(face = "bold")
+    plot.tag = element_text(face = "bold"),
+    #plot.tag.position = c(0, 1),
+    #plot.margin = margin(20, 20, 20, 40)
   )
 
 ggsave("All_code_data_visualization/plot/abundance.png", dpi = 300, width = 15, height = 12, units = "cm") 
 ########## standardize biomass visualization #####
-abu_bio |> 
+b = abu_bio |> 
   dplyr::group_by(Treatment, Week) |>  #group by Treatment and Week
   rstatix::get_summary_stats(mass_flux, type = "full")|> # summarise biomass using mass flux
   ggplot(aes(Week,mean, fill = Treatment, color = Treatment, 
@@ -202,7 +228,7 @@ abu_bio |>
                 width = 0.1, position = pd, color = "black") +
   scale_fill_viridis_d(option = "plasma")+
   scale_linetype_manual(values = c("solid", "dashed"))+
-  labs(y = expression(bold("Biomass (mg m"^-2*" day"^-1*")")), 
+  labs(tag = "(b)", y = expression(bold("Biomass (mg m"^-2*" day"^-1*")")), 
        x = expression(bold("Sampling Week")))+
   theme(
     panel.background = element_blank(),
@@ -211,28 +237,46 @@ abu_bio |>
     axis.title = element_text(size = 13, color = "black",
                               face = "bold"),
     axis.text = element_text(size = 13, face = "bold", color = "black"),
-    legend.position = "bottom",
+    legend.position = "none",
     legend.text = element_text(size = 12, face = "bold", color = "black"),
     legend.title = element_text(size = 12),
     strip.text = element_text(size = 13, face = "bold"),
     plot.tag = element_text(face = "bold")
   )
 
-ggsave("All_code_data_visualization/plot/biomass.png", dpi = 300, width = 15, height = 12, units = "cm")
+#Combining the two plot
+
+library(patchwork)
+
+(a | b) + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom") 
+
+ggsave("All_code_data_visualization/plot/all_emerg.png", dpi = 300, width = 24, height = 12, units = "cm")
 ###### spider abundance #########
 
 spider_dat = readRDS("All_code_data_visualization/Data/spider_data.rds")
-
-spider_dat |> 
+library(ggpubr)
+library(superb)
+sp = spider_dat |> 
   dplyr::group_by(Treatment,Family) |> # group by Treatment and Family
-  rstatix::get_summary_stats(count, type = "full")|> # summarize by the spider count
-  ggplot(aes(Treatment, mean, fill = Family, color = Family, 
-             shape = Family, linetype = Family))+
+  rstatix::get_summary_stats(count, type = "full") # summarize by the spider count
+
+sp_l = sp |> 
+  mutate(letter = case_when(
+    Family == "Tetragnatha" & Treatment == "Control" ~ "a",  # Assign 'a' to Control group in Family 2
+    Family == "Tetragnatha" & Treatment == "Low flow" ~ "b",  # Assign 'b' to Treated group in Family 2
+    TRUE ~ ""  # Other cases remain blank (no significant difference)
+  ))
+sp_l |> 
+  ggplot(aes(Treatment, mean, shape = Treatment, linetype = Treatment))+
   geom_point(position = pd, size = 3, color = "black")+
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
                 width = 0.1, position = pd, color = "black") +
+  geom_text(aes(label = letter, y = mean + se+1.5), size = 5, color = "black") +
   ylim(0, 50)+
-  scale_shape_manual(values = c(0,8))+
+  scale_shape_manual(values = c(19,2))+
+  scale_linetype_manual(values = c("solid", "dashed"))+
+  facet_wrap(~Family)+
   labs(y = "Mean abundance per riparian area", x = "Treatment")+
   theme(
     panel.background = element_blank(),
@@ -245,9 +289,10 @@ spider_dat |>
     legend.text = element_text(size = 12, face = "bold", color = "black"),
     legend.title = element_text(size = 12),
     plot.tag = element_text(face = "bold"),
+    strip.text = element_text(face = "bold")
   )
 
-ggsave("All_code_data_visualization/plot/spider.png", dpi = 300, width = 15, height = 12, units = "cm")
+ggsave("All_code_data_visualization/plot/spider_new.png", dpi = 300, width = 18, height = 14, units = "cm")
 
 
 ######Statistical analysis of all tested hypothesis ######
@@ -332,7 +377,7 @@ plot(auto_cor_ab, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 ##run the model with sampling time and ar1, the interaction terms were not significant
 
 fit_ = glmmTMB(CPUE ~ Treatment + Week +
-                 (1 | Flume) + ar1(Week+0|Flume), #sparial autocorrelation structure
+                 (1 | Flume) + ar1(Week+0|Flume), #spatial autocorrelation structure
                data = abu_bio,
                family = Gamma(link = "log")) ##We use Gamma with log link function 
 
@@ -349,8 +394,9 @@ plot(res_sim)
 ##Type 2 Anova
 Anova(fit_, type="II") #Only the fixed factor week was significant
 
+
 emmeans(fit_, specs = pairwise ~ Treatment,
-        adjust = "bonferroni", type = "response") 
+        adjust = "bonferroni",type = "response") 
 #Pairwise comparison of the treatment
 
 m_c = emmeans(fit_, specs = pairwise ~ Week|Treatment,
@@ -387,7 +433,7 @@ plot(auto_cor_bio, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 # Perform Ljung-Box test on residuals to confirm when necessary
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
 
-fit_1 = glmmTMB(mass_flux ~ Treatment + Week +
+fit_1 = glmmTMB(mass_flux ~ Treatment + Week + 
                   (1 | Flume) + ar1(Week+0|Flume),
                 data = abu_bio,
                 family = Gamma(link = "log")) ##fit the final model with Gamma log link function
@@ -443,12 +489,14 @@ sp_t = emmeans(fit_sp,specs = pairwise ~ Treatment,
                adjust = "bonferroni", type = "response") 
 sp_t$contrasts %>%
   rbind() 
+
 #Treatment level comparison, there was no significant difference between control and low-flow
 
 sp_e = emmeans(fit_sp, specs = pairwise ~ Treatment|Family,
                      adjust = "bonferroni", type = "response")
 sp_e$contrasts %>%
   rbind() 
+
 #Tetragnatha shows a significant difference between Control and Low flow, with the Control condition 
 #showing a much higher response (ratio = 2.577, p = 0.0158). with control2.58 times higher than under low-flow. 
 #Lycosidae shows No significant difference between Control and Low flow treatments
@@ -579,10 +627,6 @@ phch = phch_1 |>
   dplyr::mutate(across(c(Flume), as.factor)) |>
   dplyr::group_by(location,treatment) |>
   rstatix::get_summary_stats(type = "full")
-
-
-##write.table(phch, file = "phch.txt", row.names = FALSE, sep = "\t", quote = FALSE)
-
 
 
 
