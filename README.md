@@ -12,15 +12,20 @@ Affilliation:
 
 Content overview:
 
-Data: Emergence data: Abundance and biomass
+Data: 
+      
+      Total emerging insects abundance and biomass data were collected over five weeks
+
+      Ephemeroptera, Plecoptera, Trichoptera (EPT) abundance data were collected over five weeks
       
       Spider abundance data from two spider taxa (Tetragnatha and Lycosidae)
       
       Pesticide concentrations data from daily water samples
       
-      Pesticide concentrations data from treatment sediment samples (Low-flow and Control)
+      Pesticide concentrations data from treatment sediment samples (Low-flow and Control) collected in weeks 4 and 6
       
       Physicochemical parameters measured from the flume during the experiment
+      
 
 Statistics:
 
