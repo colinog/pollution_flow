@@ -5,6 +5,8 @@ library(DHARMa)
 library(car)
 library(emmeans)
 library(rstatix)
+
+
 names(emerg_insect)
 the_third = emerg_insect |> 
   dplyr::filter(!Sampling %in% "Active") |> 
@@ -84,7 +86,7 @@ sed_pest = readRDS("All_code_data_visualization/Data/sediment_pesticide.rds") |>
                                TRUE ~Treatment))
 #####Summary of sediment pesticide ###########
 sed_sum = sed_pest |> 
-  dplyr::group_by(Treatment,Class,Pesticides) |> 
+  dplyr::group_by(Treatment,Class,Pesticides, LOQ_µg_kg) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "full") |> 
   mutate(Treatment = case_when(
     Treatment == "C" ~ "Control",
@@ -92,7 +94,7 @@ sed_sum = sed_pest |>
     TRUE ~ Treatment  # Keeps other values unchanged
   ))
 
-openxlsx::write.xlsx(sed_sum, "All_code_data_visualization/95_pesticide/sed_pest_sum.xlsx", rowNames = F)
+openxlsx::write.xlsx(sed_sum, "All_code_data_visualization/95_pesticide/sed_pest_sum_new.xlsx", rowNames = F)
 
 sed_wk = sed_pest |> 
   dplyr::group_by(Treatment,Week) |> 
@@ -151,7 +153,7 @@ ggsave("All_code_data_visualization/plot/pest_sed_new.png", dpi = 300, width = 1
 #aggregate(Concentration_µg_kg ~ Treatment + Week, data = sed_pest, FUN = mean)
 
 avg_sum = sed_pest |> 
-  dplyr::group_by(Treatment, Week) |> 
+  dplyr::group_by(Treatment, Week, LOQ_µg_kg) |> 
   rstatix::get_summary_stats(Concentration_µg_kg, type = "mean_ci")|> 
   dplyr::mutate(Week = case_when(
     Week == 4 ~ "Wk4",
@@ -356,10 +358,58 @@ mtw = emmeans(fit_sed, specs = pairwise ~ Week|Treatment,
 mtw$contrasts %>%
   rbind()
 
+##########Read in the Ephemeroptera, Plecoptera, Trichoptera (EPT) abundance data #######
 
+ept_day = readRDS("All_code_data_visualization/Data/EPT_abundance.rda")
+######### Run the model without spatial autocorrelation structure (ar1)
+e = glmmTMB(EPT ~ Treatment + Week * Position +
+                  (1 | Flume),
+                data = ept_day,
+                ziformula = ~1,
+                family = nbinom2(link = "log")) ##fit glmm model
+
+res_ep <- residuals(e) # extract residuals
+#calculate and plot the act
+auto_cor_ep <- acf(res_ep, lag.max=40, plot=FALSE)
+plot(auto_cor_ep, main="ACF of Residuals", xlab="Lag", ylab="ACF")
+
+#The model residuals shows serial autocorrelation
+
+eph_m = glmmTMB(EPT ~ Treatment + Week * Position +
+                  (1 | Flume) + ar1(Week+0|Flume),
+                data = ept_day,
+                ziformula = ~1,
+                family = nbinom2(link = "log")) ##fit glmm model
+
+summary(eph_m) ##model summary
+diagnose(eph_m)
+testDispersion(eph_m) ##no dispersion found
+simulateResiduals(eph_m, plot = T)
+
+####################
+##Type 2 Anova
+Anova(eph_m, type="II") #Only the fixed factor week was significant
+
+
+emmeans(eph_m, specs = pairwise ~ Treatment,
+        adjust = "bonferroni",type = "response")
+
+emmeans(eph_m, specs = pairwise ~ Position|Treatment,
+        adjust = "bonferroni",type = "response")
+#Pairwise comparison of the treatment
+
+m_eph = emmeans(eph_m, specs = pairwise ~ Week, by = c("Treatment"),
+        adjust = "bonferroni",type = "response")
+
+
+m_eph$contrasts %>%
+  rbind()
+
+write.xlsx(m_eph$contrasts %>%
+             rbind(),"All_code_data_visualization/95_pesticide/eph.xlsx" )
 
 ####Emergence data for both mass flux and emergence rate
-f = glmmTMB(CPUE ~ Treatment + Week +
+f = glmmTMB(CPUE ~ Treatment + Week + Position +
               (1 | Flume),
             data = abu_bio,
             family = Gamma(link = "log")) ##fit glmm model
@@ -376,7 +426,7 @@ plot(auto_cor_ab, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 
 ##run the model with sampling time and ar1, the interaction terms were not significant
 
-fit_ = glmmTMB(CPUE ~ Treatment + Week +
+fit_ = glmmTMB(CPUE ~ Treatment + Week + Position +
                  (1 | Flume) + ar1(Week+0|Flume), #spatial autocorrelation structure
                data = abu_bio,
                family = Gamma(link = "log")) ##We use Gamma with log link function 
@@ -397,16 +447,20 @@ Anova(fit_, type="II") #Only the fixed factor week was significant
 
 emmeans(fit_, specs = pairwise ~ Treatment,
         adjust = "bonferroni",type = "response") 
+
+#############Position response by Treatment#####
+emmeans(fit_, specs = pairwise ~ Week, by = c("Treatment"),
+       adjust = "bonferroni", type = "response")
 #Pairwise comparison of the treatment
 
-m_c = emmeans(fit_, specs = pairwise ~ Week|Treatment,
+m_c = emmeans(fit_, specs = pairwise ~ Week, by = c("Treatment"),
               adjust = "bonferroni", type = "response")
 
 m_c$contrasts %>%
   rbind() 
 
 write.xlsx(m_c$contrasts %>%
-             rbind(),"All_code_data_visualization/95_pesticide/cpue.xlsx" )
+             rbind(),"All_code_data_visualization/95_pesticide/cpue_new.xlsx" )
 
 
 
@@ -419,7 +473,7 @@ write.xlsx(m_c$contrasts %>%
 #########Biomass flux#####
 #fit inital glmm model
 
-f1 = glmmTMB(mass_flux ~ Treatment + Week +
+f1 = glmmTMB(mass_flux ~ Treatment + Week + Position +
                (1 | Flume),
              data = abu_bio,
              family = Gamma(link = "log"))
@@ -433,7 +487,7 @@ plot(auto_cor_bio, main="ACF of Residuals", xlab="Lag", ylab="ACF")
 # Perform Ljung-Box test on residuals to confirm when necessary
 #Box.test(residuals, lag = 20, type = "Ljung-Box")
 
-fit_1 = glmmTMB(mass_flux ~ Treatment + Week + 
+fit_1 = glmmTMB(mass_flux ~ Treatment + Week + Position + 
                   (1 | Flume) + ar1(Week+0|Flume),
                 data = abu_bio,
                 family = Gamma(link = "log")) ##fit the final model with Gamma log link function
@@ -464,7 +518,7 @@ m_f$contrasts %>%
   rbind() 
 
 write.xlsx(m_f$contrasts %>%
-             rbind(),"All_code_data_visualization/95_pesticide/mass.xlsx" )
+             rbind(),"All_code_data_visualization/95_pesticide/mass_new.xlsx" )
 ########Spider count model#######
 
 fit_sp = glmmTMB(count ~  Treatment * Family + (1|Flume), 
