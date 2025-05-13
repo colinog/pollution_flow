@@ -1,0 +1,6 @@
+"","Analyte","Type","variable","n","min","max","median","q1","q3","iqr","mad","mean","sd","se","ci"
+"1","Dimethomorph","Fungicide","Concentration",42,0.007,1.675,0.05,0.02,0.186,0.166,0.055,0.154,0.283,0.044,0.088
+"2","Metrafenone","Fungicide","Concentration",33,0.075,0.876,0.16,0.116,0.292,0.177,0.086,0.251,0.219,0.038,0.078
+"3","Dimethenamid-P","Herbicide","Concentration",47,0.002,0.559,0.009,0.004,0.036,0.032,0.011,0.045,0.092,0.013,0.027
+"4","Maipropamid","Fungicide","Concentration",41,0.008,0.398,0.022,0.014,0.053,0.039,0.018,0.054,0.078,0.012,0.025
+"5","Difenconazole","Fungicide","Concentration",2,0.253,0.372,0.313,0.283,0.342,0.059,0.088,0.313,0.084,0.059,0.755
