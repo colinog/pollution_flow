@@ -1,6 +1,6 @@
 # pollution_flow
 
-This repository contains data and r code for the manuscript (Flow reduction affects subsidy of riparian ecosystem by contaminated streams: evidence from a mesocosm study) to be submitted for publication.
+This repository contains data and r code for the manuscript (Flow reduction in a pesticide-contaminated streammesocosm affects emerging aquatic insects and alters riparian spider communities) to be submitted for publication.
 
 Wriiten by Collins Ogbeide, 
 
