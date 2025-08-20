@@ -1,6 +1,6 @@
 # pollution_flow
 
-This repository contains data and r code for the manuscript (Flow reduction in a pesticide-exposed stream mesocosm affects emerging aquatic insects and alters riparian spider communities) to be submitted for publication.
+This repository provides the data and r code for the study _Flow reduction in a pesticide-exposed stream mesocosm affects emerging aquatic insects and alters riparian spider communities_, published in Archives of Environmental Contamination and Toxicology (DOI: https://doi.org/10.1007/s00244-025-01146-5)
 
 Wriiten by Collins Ogbeide, 
 
